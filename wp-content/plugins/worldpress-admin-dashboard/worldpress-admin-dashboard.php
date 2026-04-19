@@ -31,10 +31,15 @@ function worldpress_admin_dashboard_render(): void
         wp_die(__('Nincs jogosultságod az oldal megtekintéséhez.', 'worldpress-admin-dashboard'));
     }
 
-    $post_count = (int) wp_count_posts()->publish;
-    $page_count = (int) wp_count_posts('page')->publish;
-    $comment_count = (int) wp_count_comments()->approved;
-    $user_count = (int) count_users()['total_users'];
+    $posts = wp_count_posts();
+    $pages = wp_count_posts('page');
+    $comments = wp_count_comments();
+    $users = count_users();
+
+    $post_count = (is_object($posts) && isset($posts->publish)) ? (int) $posts->publish : 0;
+    $page_count = (is_object($pages) && isset($pages->publish)) ? (int) $pages->publish : 0;
+    $comment_count = (is_object($comments) && isset($comments->approved)) ? (int) $comments->approved : 0;
+    $user_count = (is_array($users) && isset($users['total_users'])) ? (int) $users['total_users'] : 0;
     ?>
     <div class="wrap">
         <h1><?php echo esc_html__('WorldPress Admin Dashboard', 'worldpress-admin-dashboard'); ?></h1>
