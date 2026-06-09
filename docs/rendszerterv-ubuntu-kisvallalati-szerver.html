@@ -21,18 +21,18 @@
     .note { background: #fff8e1; border-left: 5px solid #ffb300; padding: 10px 12px; margin: 16px 0; }
     .small { color: #555; font-size: 0.95em; }
     code { background: #f5f5f5; padding: 1px 4px; border-radius: 3px; }
-    pre { background: #f7f9fb; border: 1px solid #d9e2e8; padding: 12px; overflow-x: auto; }
+    pre { background: #f7f9fb; border: 1px solid #d9e2e8; padding: 12px; overflow-x: auto; white-space: pre-wrap; }
     ul, ol { margin-top: 6px; }
   </style>
 </head>
 <body>
   <h1>Rendszerterv – Ubuntu Server LTS alapú egygépes kisvállalati szerver</h1>
-  <p><strong>Verzió:</strong> v4.1<br />
+  <p><strong>Verzió:</strong> v5<br />
   <strong>Dátum:</strong> 2026-06-09<br />
   <strong>Cél:</strong> WordPress + saját PHP/Java alkalmazások + MariaDB + belső fájlmegosztás + backup + Microsoft 365 / Entra integráció</p>
 
   <div class="note">
-    <strong>Fontos frissítés:</strong> az alaplap nem támogat hardveres RAID-et, ezért a terv <strong>Linux szoftveres RAID-re</strong> épül: <code>mdadm</code> + opcionális <code>LVM</code> + <code>ext4</code>. Hardveres/alaplapi RAID nem szükséges.
+    <strong>Fontos:</strong> az alaplap nem támogat hardveres RAID-et, ezért a terv <strong>Linux szoftveres RAID-re</strong> épül: <code>mdadm</code> + opcionális <code>LVM</code> + <code>ext4</code>. Hardveres/alaplapi RAID nem szükséges.
   </div>
 
   <h2>1. Áttekintés</h2>
@@ -44,40 +44,15 @@
     <li><strong>helyi és külső backup folyamatokat</strong></li>
     <li><strong>Microsoft 365 / Entra ID integrációt</strong></li>
   </ul>
-  <p>A cél egy <strong>egyszerűen üzemeltethető, biztonságos, jól tagolt</strong> infrastruktúra.</p>
 
   <h2>2. Fő funkciók</h2>
   <table>
-    <tr>
-      <th>Funkció</th>
-      <th>Szerep</th>
-      <th>Jelölés</th>
-    </tr>
-    <tr class="green">
-      <td><strong>Publikus web</strong></td>
-      <td>WordPress, saját PHP appok, Java appok reverse proxy mögött</td>
-      <td>🟩 Zöld</td>
-    </tr>
-    <tr class="blue">
-      <td><strong>Belső szolgáltatások</strong></td>
-      <td>SSH admin, Samba, belső elérés, backup forgalom</td>
-      <td>🟦 Kék</td>
-    </tr>
-    <tr class="orange">
-      <td><strong>Adat és tárolás</strong></td>
-      <td>MariaDB, fájltárolás, share-ek, mentési terület</td>
-      <td>🟧 Narancs</td>
-    </tr>
-    <tr class="purple">
-      <td><strong>Integráció</strong></td>
-      <td>Entra ID, Microsoft Graph alapú email küldés</td>
-      <td>🟪 Lila</td>
-    </tr>
-    <tr class="red">
-      <td><strong>Biztonság</strong></td>
-      <td>Tűzfal, TLS, fail2ban, jogosultságok, frissítések</td>
-      <td>🟥 Piros</td>
-    </tr>
+    <tr><th>Funkció</th><th>Szerep</th><th>Jelölés</th></tr>
+    <tr class="green"><td><strong>Publikus web</strong></td><td>WordPress, saját PHP appok, Java appok reverse proxy mögött</td><td>🟩 Zöld</td></tr>
+    <tr class="blue"><td><strong>Belső szolgáltatások</strong></td><td>SSH admin, Samba, belső elérés, backup forgalom</td><td>🟦 Kék</td></tr>
+    <tr class="orange"><td><strong>Adat és tárolás</strong></td><td>MariaDB, fájltárolás, share-ek, mentési terület</td><td>🟧 Narancs</td></tr>
+    <tr class="purple"><td><strong>Integráció</strong></td><td>Entra ID, Microsoft Graph alapú email küldés</td><td>🟪 Lila</td></tr>
+    <tr class="red"><td><strong>Biztonság</strong></td><td>Tűzfal, TLS, fail2ban, jogosultságok, frissítések</td><td>🟥 Piros</td></tr>
   </table>
 
   <h2>3. Hardver konfiguráció</h2>
@@ -90,14 +65,8 @@
     <tr><td>NIC1</td><td>Publikus hálózat</td></tr>
     <tr><td>NIC2</td><td>Belső/intranet hálózat</td></tr>
   </table>
-  <p><strong>Javasolt szerepkiosztás:</strong></p>
-  <ul>
-    <li><strong>NIC1:</strong> publikus webes forgalom</li>
-    <li><strong>NIC2:</strong> adminisztráció, Samba, backup, belső szolgáltatások</li>
-  </ul>
 
   <h2>4. Gyakorlati architektúra</h2>
-  <p>A szerver egy gépen futtatja az alábbi szerepköröket:</p>
   <ul>
     <li><strong>Publikus szolgáltatások:</strong> WordPress, saját PHP appok, saját Java appok Apache reverse proxy mögött</li>
     <li><strong>Belső szolgáltatások:</strong> SSH admin, Samba, backup műveletek, opcionális belső admin végpontok</li>
@@ -106,7 +75,6 @@
   </ul>
 
   <h2>5. Tárolási terv</h2>
-  <p><strong>Véglegesített gyakorlati modell:</strong></p>
   <ul>
     <li><strong>md0</strong> – rendszer: SSD1 + SSD2 → <code>mdadm RAID1</code></li>
     <li><strong>md1</strong> – adat: SSD3 + SSD4 → <code>mdadm RAID1</code></li>
@@ -130,38 +98,55 @@
   <p><strong>Technológiai javaslat:</strong> <code>mdadm</code> + opcionális <code>LVM</code> + <code>ext4</code></p>
   <p><strong>Swap:</strong> külön partíció helyett <strong>8 GB swapfile</strong></p>
 
+  <h3>Storage telepítési minta</h3>
+  <div class="note">
+    Az eszköznevek (<code>/dev/sda</code>, <code>/dev/sdb</code>, stb.) telepítésenként eltérhetnek. Mielőtt bármit létrehozol vagy törölsz, ellenőrizd a valós lemezkiosztást: <code>lsblk -o NAME,SIZE,TYPE,MODEL</code>.
+  </div>
+  <pre># csomagok
+sudo apt update
+sudo apt install -y mdadm lvm2
+
+# lemezek ellenőrzése
+lsblk -o NAME,SIZE,TYPE,MODEL
+
+# példa tömbök létrehozása
+# rendszer RAID1
+sudo mdadm --create /dev/md0 --level=1 --raid-devices=2 /dev/sda /dev/sdb
+
+# adat RAID1
+sudo mdadm --create /dev/md1 --level=1 --raid-devices=2 /dev/sdc /dev/sdd
+
+# fájlrendszerek
+sudo mkfs.ext4 /dev/md0
+sudo mkfs.ext4 /dev/md1
+
+# mountpontok
+sudo mkdir -p /mnt/md0 /mnt/md1
+sudo mount /dev/md0 /mnt/md0
+sudo mount /dev/md1 /mnt/md1
+
+# tartós mdadm config
+sudo mdadm --detail --scan | sudo tee -a /etc/mdadm/mdadm.conf
+sudo update-initramfs -u</pre>
+
   <h2>6. Könyvtárstruktúra</h2>
-  <h3 class="green">🟩 Web</h3>
   <ul>
     <li><code>/srv/www/wordpress</code></li>
     <li><code>/srv/www/app1</code></li>
     <li><code>/srv/www/app2</code></li>
-  </ul>
-  <h3 class="green">🟩 Java</h3>
-  <ul>
     <li><code>/opt/apps/app1</code></li>
     <li><code>/opt/apps/app2</code></li>
-  </ul>
-  <h3 class="orange">🟧 Adatok</h3>
-  <ul>
     <li><code>/srv/data/app1</code></li>
     <li><code>/srv/data/app2</code></li>
     <li><code>/srv/data/uploads</code></li>
-  </ul>
-  <h3 class="blue">🟦 Samba</h3>
-  <ul>
     <li><code>/srv/share/common</code></li>
     <li><code>/srv/share/projects</code></li>
     <li><code>/srv/share/exchange</code></li>
-  </ul>
-  <h3 class="orange">🟧 Backup</h3>
-  <ul>
     <li><code>/srv/backup/daily</code></li>
     <li><code>/srv/backup/restic</code></li>
   </ul>
 
   <h2>7. Hálózati terv</h2>
-  <p><strong>Példa interfésznevek:</strong></p>
   <ul>
     <li><code>enp1s0</code> = publikus</li>
     <li><code>enp2s0</code> = belső</li>
@@ -183,9 +168,6 @@
     <li>gateway: nincs</li>
   </ul>
 
-  <p><strong>Szabály:</strong> default route csak a publikus interfészen legyen. SSH és Samba csak a belső IP-ről legyen elérhető.</p>
-
-  <h3>Netplan minta</h3>
   <pre>network:
   version: 2
   renderer: networkd
@@ -208,12 +190,13 @@
       addresses:
         - 10.1.200.10/16</pre>
 
-  <h3>Gyakorlati ellenőrzés</h3>
-  <ul>
-    <li>A <code>195.199.215.1/29</code> cím egy érvényes host cím a <code>195.199.215.0/29</code> hálózatban.</li>
-    <li>A használható hosttartomány: <code>195.199.215.1</code> – <code>195.199.215.6</code>.</li>
-    <li>A hálózati cím: <code>195.199.215.0</code>, a broadcast cím: <code>195.199.215.7</code>.</li>
-  </ul>
+  <h3>Netplan alkalmazás</h3>
+  <pre>sudo nano /etc/netplan/01-server.yaml
+sudo netplan generate
+sudo netplan try
+sudo netplan apply
+ip a
+ip r</pre>
 
   <h2>8. Porttérkép</h2>
   <table>
@@ -229,8 +212,6 @@
   </table>
 
   <h2>9. Tűzfal és elérési szabályok</h2>
-  <p><strong>Publikus oldal:</strong> csak <code>80/tcp</code> és <code>443/tcp</code>.</p>
-  <p><strong>Belső oldal:</strong> csak a <code>10.1.0.0/16</code> hálózatból legyen engedélyezve az SSH és a Samba.</p>
   <pre>sudo ufw default deny incoming
 sudo ufw default allow outgoing
 
@@ -241,7 +222,8 @@ sudo ufw allow from 10.1.0.0/16 to any port 22 proto tcp
 sudo ufw allow from 10.1.0.0/16 to any port 445 proto tcp
 sudo ufw allow from 10.1.0.0/16 to any port 139 proto tcp
 
-sudo ufw enable</pre>
+sudo ufw enable
+sudo ufw status verbose</pre>
 
   <h2>10. Szolgáltatás-kiosztás</h2>
   <h3 class="green">🟩 Apache</h3>
@@ -253,18 +235,12 @@ sudo ufw enable</pre>
   </ul>
 
   <h3 class="green">🟩 PHP-FPM</h3>
-  <p>Külön poolok:</p>
   <ul>
     <li><code>wordpress</code></li>
     <li><code>app1</code></li>
     <li><code>app2</code></li>
   </ul>
-  <p>Javasolt userek:</p>
-  <ul>
-    <li><code>wp-www</code></li>
-    <li><code>app1-www</code></li>
-    <li><code>app2-www</code></li>
-  </ul>
+  <p>Javasolt userek: <code>wp-www</code>, <code>app1-www</code>, <code>app2-www</code></p>
 
   <h3 class="green">🟩 Java appok</h3>
   <ul>
@@ -285,49 +261,93 @@ sudo ufw enable</pre>
     <li><code>app1.domain.hu</code> → PHP app1</li>
     <li><code>app2.domain.hu</code> → PHP app2</li>
     <li><code>api.domain.hu</code> → Java app1 proxy</li>
-    <li><code>admin.domain.local</code> → opcionális belső admin</li>
   </ul>
   <p>Elv: minden site külön vhost, külön log, külön document root, külön PHP pool vagy proxy target, HTTPS mindenen.</p>
 
-  <h2>12. MariaDB terv</h2>
-  <p><strong>Adatbázisok:</strong></p>
+  <pre># szükséges modulok
+sudo a2enmod ssl headers rewrite proxy proxy_http proxy_fcgi setenvif
+sudo systemctl restart apache2</pre>
+
+  <h3>Vhost minta – WordPress</h3>
+  <pre>&lt;VirtualHost *:80&gt;
+    ServerName www.domain.hu
+    DocumentRoot /srv/www/wordpress
+
+    ErrorLog ${APACHE_LOG_DIR}/wordpress-error.log
+    CustomLog ${APACHE_LOG_DIR}/wordpress-access.log combined
+
+    &lt;Directory /srv/www/wordpress&gt;
+        AllowOverride All
+        Require all granted
+    &lt;/Directory&gt;
+&lt;/VirtualHost&gt;</pre>
+
+  <h3>Vhost minta – Java app proxy</h3>
+  <pre>&lt;VirtualHost *:80&gt;
+    ServerName api.domain.hu
+
+    ProxyPreserveHost On
+    ProxyPass / http://127.0.0.1:8081/
+    ProxyPassReverse / http://127.0.0.1:8081/
+
+    ErrorLog ${APACHE_LOG_DIR}/api-error.log
+    CustomLog ${APACHE_LOG_DIR}/api-access.log combined
+&lt;/VirtualHost&gt;</pre>
+
+  <h2>12. PHP-FPM pool minta</h2>
+  <pre>[wordpress]
+user = wp-www
+group = wp-www
+listen = /run/php/php-wordpress.sock
+listen.owner = www-data
+listen.group = www-data
+pm = dynamic
+pm.max_children = 20
+pm.start_servers = 3
+pm.min_spare_servers = 2
+pm.max_spare_servers = 5
+chdir = /</pre>
+
+  <h2>13. MariaDB terv</h2>
   <ul>
     <li><code>wordpress_db</code></li>
     <li><code>app1_db</code></li>
     <li><code>app2_db</code></li>
   </ul>
-  <p><strong>Userek:</strong></p>
-  <ul>
-    <li><code>wordpress_user</code></li>
-    <li><code>app1_user</code></li>
-    <li><code>app2_user</code></li>
-  </ul>
-  <p><strong>Beállítások:</strong> bind-address = <code>127.0.0.1</code>, karakterkészlet <code>utf8mb4</code>, root távoli login tiltva.</p>
-  <p><strong>Mentés:</strong> napi SQL dump, lokális retention legalább 7–14 nap.</p>
+  <p>Userek: <code>wordpress_user</code>, <code>app1_user</code>, <code>app2_user</code></p>
+  <p>Beállítások: <code>bind-address = 127.0.0.1</code>, karakterkészlet <code>utf8mb4</code>, root távoli login tiltva.</p>
 
-  <h2>13. Samba terv</h2>
-  <p><strong>Share-ek:</strong></p>
-  <ul>
-    <li><code>common</code> – általános irodai fájlok</li>
-    <li><code>projects</code> – projektdokumentumok</li>
-    <li><code>exchange</code> – ideiglenes csereanyagok</li>
-  </ul>
-  <p><strong>Könyvtárak:</strong> <code>/srv/share/common</code>, <code>/srv/share/projects</code>, <code>/srv/share/exchange</code></p>
-  <p><strong>Jogosultsági csoportok:</strong> <code>office</code>, <code>projects</code>, opcionálisan <code>management</code></p>
-  <p><strong>Fontos szabály:</strong> WordPress vagy app source ne legyen általános SMB share.</p>
+  <pre>sudo mysql_secure_installation</pre>
+
+  <h3>Napi dump minta</h3>
+  <pre>mysqldump --single-transaction --routines --events --databases wordpress_db app1_db app2_db &gt; /srv/backup/daily/db-$(date +%F).sql</pre>
+
+  <h2>14. Samba terv</h2>
+  <p>Share-ek: <code>common</code>, <code>projects</code>, <code>exchange</code></p>
+  <p>Könyvtárak: <code>/srv/share/common</code>, <code>/srv/share/projects</code>, <code>/srv/share/exchange</code></p>
+  <p>Jogosultsági csoportok: <code>office</code>, <code>projects</code>, opcionálisan <code>management</code></p>
+
   <pre>interfaces = lo enp2s0 10.1.200.10/16
 bind interfaces only = yes</pre>
 
-  <h2>14. WordPress + Entra + Graph</h2>
+  <h3>Share minta</h3>
+  <pre>[common]
+   path = /srv/share/common
+   browseable = yes
+   read only = no
+   valid users = @office
+   create mask = 0660
+   directory mask = 0770</pre>
+
+  <h2>15. WordPress + Entra + Graph</h2>
   <ul>
     <li>WordPress külön könyvtárban, külön adatbázissal, külön PHP poollal</li>
     <li>Entra login: WPO365 vagy hasonló plugin</li>
     <li>Graph mail: contact form, jelszó-visszaállítás, admin riasztások</li>
     <li>nincs helyi SMTP szerver</li>
   </ul>
-  <p><strong>Külön figyelni kell:</strong> secret kezelés, plugin update kompatibilitás, token renewal.</p>
 
-  <h2>15. Backup terv</h2>
+  <h2>16. Backup terv</h2>
   <p><strong>Mentendő elemek:</strong></p>
   <ul>
     <li><code>/etc</code></li>
@@ -342,33 +362,30 @@ bind interfaces only = yes</pre>
     <li>systemd unitok</li>
   </ul>
   <p><strong>Cél:</strong> <code>/srv/backup/daily</code></p>
-  <p><strong>Verziózott mentés:</strong> <code>restic</code> repository lokális staginggel, később külső célra szinkronizálva.</p>
-  <p><strong>Ütemezés:</strong></p>
-  <ul>
-    <li>naponta: DB dump, config mentés, fájlmentés</li>
-    <li>hetente: teljes backup ellenőrzés</li>
-    <li>havonta: restore teszt</li>
-  </ul>
 
-  <h2>16. Biztonsági baseline</h2>
-  <h3 class="red">🟥 SSH</h3>
+  <pre># egyszerű restic példa
+export RESTIC_REPOSITORY=/srv/backup/restic
+export RESTIC_PASSWORD='eros-jelszo'
+
+restic init
+restic backup /etc /srv/www /srv/data /srv/share /opt/apps</pre>
+
+  <h3>Cron példa</h3>
+  <pre>0 2 * * * /usr/local/bin/db-backup.sh
+30 2 * * * /usr/bin/restic backup /etc /srv/www /srv/data /srv/share /opt/apps</pre>
+
+  <h2>17. Biztonsági baseline</h2>
   <ul>
-    <li>csak belső NIC</li>
+    <li>SSH csak belső NIC-en</li>
     <li>root tiltva</li>
     <li>password auth tiltva</li>
     <li>key auth</li>
     <li>ajánlott <code>ListenAddress 10.1.200.10</code></li>
-  </ul>
-
-  <h3 class="red">🟥 Egyéb</h3>
-  <ul>
     <li>MariaDB localhost only</li>
-    <li>Apache lehet minden interfészen, de tűzfallal korlátozva; szigorúbb megoldásnál csak a publikus IP-n figyeljen</li>
-    <li>Apache/PHP: server tokens off, directory listing off, szükségtelen modulok off</li>
+    <li>Samba csak belső interfészen</li>
   </ul>
 
-  <h2>17. Csomaglista</h2>
-  <h3>Alap</h3>
+  <h2>18. Csomaglista</h2>
   <ul>
     <li>openssh-server</li>
     <li>curl</li>
@@ -382,16 +399,8 @@ bind interfaces only = yes</pre>
     <li>ufw</li>
     <li>fail2ban</li>
     <li>unattended-upgrades</li>
-  </ul>
-
-  <h3>Storage</h3>
-  <ul>
     <li>mdadm</li>
     <li>lvm2</li>
-  </ul>
-
-  <h3>Web</h3>
-  <ul>
     <li>apache2</li>
     <li>php-fpm</li>
     <li>php-mysql</li>
@@ -403,30 +412,14 @@ bind interfaces only = yes</pre>
     <li>php-intl</li>
     <li>php-bcmath</li>
     <li>php-imagick</li>
-  </ul>
-
-  <h3>DB</h3>
-  <ul>
     <li>mariadb-server</li>
     <li>mariadb-client</li>
-  </ul>
-
-  <h3>Java</h3>
-  <ul>
     <li>openjdk-21-jre-headless</li>
-  </ul>
-
-  <h3>Share</h3>
-  <ul>
     <li>samba</li>
-  </ul>
-
-  <h3>Backup</h3>
-  <ul>
     <li>restic</li>
   </ul>
 
-  <h2>18. Telepítési sorrend</h2>
+  <h2>19. Telepítési sorrend</h2>
   <ol>
     <li>Ubuntu Server 24.04 LTS tiszta telepítés</li>
     <li>Hálózati interfésznevek és IP-k ellenőrzése</li>
@@ -446,7 +439,7 @@ bind interfaces only = yes</pre>
     <li>tesztek és dokumentálás</li>
   </ol>
 
-  <h2>19. Végső ajánlott v4.1 profil</h2>
+  <h2>20. Végső ajánlott v5 profil</h2>
   <table>
     <tr><th>Terület</th><th>Ajánlás</th></tr>
     <tr><td>Operációs rendszer</td><td>Ubuntu Server 24.04 LTS</td></tr>
@@ -454,6 +447,7 @@ bind interfaces only = yes</pre>
     <tr><td>Mount modell</td><td><code>/</code>, <code>/var</code>, <code>/opt</code>, valamint külön <code>/srv</code></td></tr>
     <tr><td>Publikus IP</td><td><code>195.199.215.1/29</code>, gateway: <code>195.199.215.6</code></td></tr>
     <tr><td>Belső IP</td><td><code>10.1.200.10/16</code></td></tr>
+    <tr><td>DNS</td><td><code>195.199.255.57</code>, <code>195.199.255.58</code></td></tr>
     <tr><td>Web</td><td>Apache2 + PHP-FPM + WordPress + saját PHP appok</td></tr>
     <tr><td>Java</td><td>systemd service + Apache reverse proxy</td></tr>
     <tr><td>Adatbázis</td><td>MariaDB localhost only</td></tr>
@@ -464,19 +458,18 @@ bind interfaces only = yes</pre>
     <tr><td>Biztonság</td><td>SSH internal only, UFW/nftables, fail2ban, TLS</td></tr>
   </table>
 
-  <h2>20. Következő lépések</h2>
+  <h2>21. Következő lépések</h2>
   <ol>
-    <li>Storage telepítési terv parancsokkal</li>
-    <li>Netplan kész fájl végleges interfésznevekkel</li>
-    <li>UFW szabályok</li>
-    <li>Apache vhost minták</li>
-    <li>PHP-FPM pool minták</li>
-    <li>Samba minta</li>
-    <li>Backup script / cron minta</li>
-    <li>Telepítési checklist</li>
+    <li>Valós lemezazonosítók alapján pontos storage parancssor</li>
+    <li>Végleges netplan interfésznevekkel</li>
+    <li>Apache SSL vhost minták</li>
+    <li>PHP-FPM poolok finomhangolása</li>
+    <li>Samba jogosultsági struktúra</li>
+    <li>Backup script fájlok elkészítése</li>
+    <li>Telepítési checklist külön dokumentumban</li>
   </ol>
 
-  <h2>21. Megjegyzés</h2>
-  <p>Ez a dokumentum már egy <strong>gyakorlatias, megépíthető v4.1 alapverzió</strong>, valós hálózati adatokkal kiegészítve.</p>
+  <h2>22. Megjegyzés</h2>
+  <p>Ez a dokumentum már egy <strong>gyakorlatias, parancsokkal kiegészített v5 alapverzió</strong>, amelyre közvetlenül ráépíthető a tényleges telepítés.</p>
 </body>
 </html>
