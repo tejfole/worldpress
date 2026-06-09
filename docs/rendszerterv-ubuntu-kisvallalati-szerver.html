@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Rendszerterv – Ubuntu Server LTS alapú egygépes kisvállalati szerver</title>
+  <title>Rendszerterv – Ubuntu Server 26.04 LTS alapú egygépes kisvállalati szerver</title>
   <style>
     body { font-family: Arial, Helvetica, sans-serif; line-height: 1.55; color: #222; margin: 40px; }
     h1, h2, h3 { color: #1f3b5b; }
@@ -26,10 +26,10 @@
   </style>
 </head>
 <body>
-  <h1>Rendszerterv – Ubuntu Server LTS alapú egygépes kisvállalati szerver</h1>
-  <p><strong>Verzió:</strong> v5<br />
+  <h1>Rendszerterv – Ubuntu Server 26.04 LTS alapú egygépes kisvállalati szerver</h1>
+  <p><strong>Verzió:</strong> v5.1<br />
   <strong>Dátum:</strong> 2026-06-09<br />
-  <strong>Cél:</strong> WordPress + saját PHP/Java alkalmazások + MariaDB + belső fájlmegosztás + backup + Microsoft 365 / Entra integráció</p>
+  <strong>Cél:</strong> WordPress + saját PHP/Java alkalmazások + MariaDB + belső fájlmegosztás + backup + Microsoft 365 / Entra integráció + GNOME + Webmin + phpMyAdmin</p>
 
   <div class="note">
     <strong>Fontos:</strong> az alaplap nem támogat hardveres RAID-et, ezért a terv <strong>Linux szoftveres RAID-re</strong> épül: <code>mdadm</code> + opcionális <code>LVM</code> + <code>ext4</code>. Hardveres/alaplapi RAID nem szükséges.
@@ -43,16 +43,18 @@
     <li><strong>adatbázis alapú alkalmazásokat</strong></li>
     <li><strong>helyi és külső backup folyamatokat</strong></li>
     <li><strong>Microsoft 365 / Entra ID integrációt</strong></li>
+    <li><strong>grafikus adminisztrációt GNOME környezettel</strong></li>
+    <li><strong>belső adminisztrációs felületeket Webminnel és phpMyAdminnal</strong></li>
   </ul>
 
   <h2>2. Fő funkciók</h2>
   <table>
     <tr><th>Funkció</th><th>Szerep</th><th>Jelölés</th></tr>
     <tr class="green"><td><strong>Publikus web</strong></td><td>WordPress, saját PHP appok, Java appok reverse proxy mögött</td><td>🟩 Zöld</td></tr>
-    <tr class="blue"><td><strong>Belső szolgáltatások</strong></td><td>SSH admin, Samba, belső elérés, backup forgalom</td><td>🟦 Kék</td></tr>
+    <tr class="blue"><td><strong>Belső szolgáltatások</strong></td><td>SSH admin, Samba, belső elérés, backup forgalom, Webmin, phpMyAdmin</td><td>🟦 Kék</td></tr>
     <tr class="orange"><td><strong>Adat és tárolás</strong></td><td>MariaDB, fájltárolás, share-ek, mentési terület</td><td>🟧 Narancs</td></tr>
     <tr class="purple"><td><strong>Integráció</strong></td><td>Entra ID, Microsoft Graph alapú email küldés</td><td>🟪 Lila</td></tr>
-    <tr class="red"><td><strong>Biztonság</strong></td><td>Tűzfal, TLS, fail2ban, jogosultságok, frissítések</td><td>🟥 Piros</td></tr>
+    <tr class="red"><td><strong>Biztonság</strong></td><td>Tűzfal, TLS, fail2ban, jogosultságok, frissítések, admin felületek korlátozása</td><td>🟥 Piros</td></tr>
   </table>
 
   <h2>3. Hardver konfiguráció</h2>
@@ -65,11 +67,14 @@
     <tr><td>NIC1</td><td>Publikus hálózat</td></tr>
     <tr><td>NIC2</td><td>Belső/intranet hálózat</td></tr>
   </table>
+  <div class="note">
+    A <strong>GNOME</strong> beemelése növeli a memória- és erőforrásigényt. A 16 GB RAM elegendő lehet indulásra, de Java alkalmazások növekedése esetén a <strong>32 GB RAM</strong> hosszabb távon jobb cél.
+  </div>
 
   <h2>4. Gyakorlati architektúra</h2>
   <ul>
     <li><strong>Publikus szolgáltatások:</strong> WordPress, saját PHP appok, saját Java appok Apache reverse proxy mögött</li>
-    <li><strong>Belső szolgáltatások:</strong> SSH admin, Samba, backup műveletek, opcionális belső admin végpontok</li>
+    <li><strong>Belső szolgáltatások:</strong> SSH admin, Samba, backup műveletek, Webmin, phpMyAdmin, GNOME alapú helyi admin</li>
     <li><strong>Adatszolgáltatások:</strong> MariaDB, fájltárolás, mentési tárterület</li>
     <li><strong>Integráció:</strong> Entra ID login, Microsoft Graph alapú email küldés</li>
   </ul>
@@ -110,10 +115,7 @@ sudo apt install -y mdadm lvm2
 lsblk -o NAME,SIZE,TYPE,MODEL
 
 # példa tömbök létrehozása
-# rendszer RAID1
 sudo mdadm --create /dev/md0 --level=1 --raid-devices=2 /dev/sda /dev/sdb
-
-# adat RAID1
 sudo mdadm --create /dev/md1 --level=1 --raid-devices=2 /dev/sdc /dev/sdd
 
 # fájlrendszerek
@@ -204,12 +206,14 @@ ip r</pre>
     <tr><td>80</td><td>TCP</td><td>publikus</td><td>HTTP</td></tr>
     <tr><td>443</td><td>TCP</td><td>publikus</td><td>HTTPS</td></tr>
     <tr><td>22</td><td>TCP</td><td>belső</td><td>SSH admin</td></tr>
-    <tr><td>445</td><td>TCP</td><td>belső</td><td>Samba</td></tr>
     <tr><td>139</td><td>TCP</td><td>belső</td><td>Samba legacy</td></tr>
+    <tr><td>445</td><td>TCP</td><td>belső</td><td>Samba</td></tr>
+    <tr><td>10000</td><td>TCP</td><td>belső</td><td>Webmin</td></tr>
     <tr><td>3306</td><td>TCP</td><td>csak localhost</td><td>MariaDB</td></tr>
     <tr><td>8081</td><td>TCP</td><td>localhost</td><td>Java app1</td></tr>
     <tr><td>8082</td><td>TCP</td><td>localhost</td><td>Java app2</td></tr>
   </table>
+  <p><strong>phpMyAdmin:</strong> ne külön publikus porton menjen, hanem Apache alá integrálva, csak belső hálóról vagy extra védelemmel elérhetően.</p>
 
   <h2>9. Tűzfal és elérési szabályok</h2>
   <pre>sudo ufw default deny incoming
@@ -219,8 +223,9 @@ sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
 
 sudo ufw allow from 10.1.0.0/16 to any port 22 proto tcp
-sudo ufw allow from 10.1.0.0/16 to any port 445 proto tcp
 sudo ufw allow from 10.1.0.0/16 to any port 139 proto tcp
+sudo ufw allow from 10.1.0.0/16 to any port 445 proto tcp
+sudo ufw allow from 10.1.0.0/16 to any port 10000 proto tcp
 
 sudo ufw enable
 sudo ufw status verbose</pre>
@@ -232,6 +237,7 @@ sudo ufw status verbose</pre>
     <li>TLS</li>
     <li>reverse proxy</li>
     <li>PHP oldalak kiszolgálása</li>
+    <li>phpMyAdmin kiszolgálása belső/admin vhost alatt</li>
   </ul>
 
   <h3 class="green">🟩 PHP-FPM</h3>
@@ -255,17 +261,25 @@ sudo ufw status verbose</pre>
     <li>külön DB user alkalmazásonként</li>
   </ul>
 
+  <h3 class="blue">🟦 Admin felületek</h3>
+  <ul>
+    <li><strong>GNOME:</strong> helyi grafikus adminisztrációhoz</li>
+    <li><strong>Webmin:</strong> csak belső hálóról elérhető</li>
+    <li><strong>phpMyAdmin:</strong> csak belső/admin elérésre, IP-szűréssel vagy extra auth védelemmel</li>
+  </ul>
+
   <h2>11. Apache vhost modell</h2>
   <ul>
     <li><code>www.domain.hu</code> → WordPress</li>
     <li><code>app1.domain.hu</code> → PHP app1</li>
     <li><code>app2.domain.hu</code> → PHP app2</li>
     <li><code>api.domain.hu</code> → Java app1 proxy</li>
+    <li><code>admin.domain.local</code> → belső admin, phpMyAdmin opcionálisan itt</li>
   </ul>
   <p>Elv: minden site külön vhost, külön log, külön document root, külön PHP pool vagy proxy target, HTTPS mindenen.</p>
 
   <pre># szükséges modulok
-sudo a2enmod ssl headers rewrite proxy proxy_http proxy_fcgi setenvif
+sudo a2enmod ssl headers rewrite proxy proxy_http proxy_fcgi setenvif auth_basic
 sudo systemctl restart apache2</pre>
 
   <h3>Vhost minta – WordPress</h3>
@@ -294,6 +308,21 @@ sudo systemctl restart apache2</pre>
     CustomLog ${APACHE_LOG_DIR}/api-access.log combined
 &lt;/VirtualHost&gt;</pre>
 
+  <h3>Vhost minta – phpMyAdmin belső elérésre</h3>
+  <pre>&lt;VirtualHost *:80&gt;
+    ServerName admin.domain.local
+
+    Alias /phpmyadmin /usr/share/phpmyadmin
+
+    &lt;Directory /usr/share/phpmyadmin&gt;
+        Require ip 10.1.0.0/16
+        AllowOverride None
+    &lt;/Directory&gt;
+
+    ErrorLog ${APACHE_LOG_DIR}/phpmyadmin-error.log
+    CustomLog ${APACHE_LOG_DIR}/phpmyadmin-access.log combined
+&lt;/VirtualHost&gt;</pre>
+
   <h2>12. PHP-FPM pool minta</h2>
   <pre>[wordpress]
 user = wp-www
@@ -316,7 +345,6 @@ chdir = /</pre>
   </ul>
   <p>Userek: <code>wordpress_user</code>, <code>app1_user</code>, <code>app2_user</code></p>
   <p>Beállítások: <code>bind-address = 127.0.0.1</code>, karakterkészlet <code>utf8mb4</code>, root távoli login tiltva.</p>
-
   <pre>sudo mysql_secure_installation</pre>
 
   <h3>Napi dump minta</h3>
@@ -326,7 +354,6 @@ chdir = /</pre>
   <p>Share-ek: <code>common</code>, <code>projects</code>, <code>exchange</code></p>
   <p>Könyvtárak: <code>/srv/share/common</code>, <code>/srv/share/projects</code>, <code>/srv/share/exchange</code></p>
   <p>Jogosultsági csoportok: <code>office</code>, <code>projects</code>, opcionálisan <code>management</code></p>
-
   <pre>interfaces = lo enp2s0 10.1.200.10/16
 bind interfaces only = yes</pre>
 
@@ -383,6 +410,8 @@ restic backup /etc /srv/www /srv/data /srv/share /opt/apps</pre>
     <li>ajánlott <code>ListenAddress 10.1.200.10</code></li>
     <li>MariaDB localhost only</li>
     <li>Samba csak belső interfészen</li>
+    <li>Webmin csak belső hálóról</li>
+    <li>phpMyAdmin csak belső hálóról vagy extra védelemmel</li>
   </ul>
 
   <h2>18. Csomaglista</h2>
@@ -417,32 +446,39 @@ restic backup /etc /srv/www /srv/data /srv/share /opt/apps</pre>
     <li>openjdk-21-jre-headless</li>
     <li>samba</li>
     <li>restic</li>
+    <li>ubuntu-desktop</li>
+    <li>webmin</li>
+    <li>phpmyadmin</li>
   </ul>
 
   <h2>19. Telepítési sorrend</h2>
   <ol>
-    <li>Ubuntu Server 24.04 LTS tiszta telepítés</li>
+    <li>Ubuntu Server <strong>26.04 LTS</strong> tiszta telepítés</li>
     <li>Hálózati interfésznevek és IP-k ellenőrzése</li>
     <li><code>mdadm</code> RAID1 tömbök kialakítása</li>
     <li>fájlrendszerek létrehozása, mountok, <code>fstab</code></li>
     <li>swapfile létrehozása</li>
     <li>alapcsomagok + hardening</li>
+    <li>GNOME desktop telepítése, ha szükséges</li>
     <li>Apache + PHP-FPM</li>
     <li>MariaDB + hardening</li>
+    <li>phpMyAdmin integrálása belső/admin elérésre</li>
     <li>WordPress alaptelepítés</li>
     <li>PHP appok</li>
     <li>Java runtime + service-ek</li>
     <li>Samba</li>
+    <li>Webmin telepítése és belső hálóra korlátozása</li>
     <li>backup</li>
     <li>TLS / domain / DNS</li>
     <li>Entra / Graph integráció</li>
     <li>tesztek és dokumentálás</li>
   </ol>
 
-  <h2>20. Végső ajánlott v5 profil</h2>
+  <h2>20. Végső ajánlott v5.1 profil</h2>
   <table>
     <tr><th>Terület</th><th>Ajánlás</th></tr>
-    <tr><td>Operációs rendszer</td><td>Ubuntu Server 24.04 LTS</td></tr>
+    <tr><td>Operációs rendszer</td><td>Ubuntu Server <strong>26.04 LTS</strong></td></tr>
+    <tr><td>Grafikus felület</td><td>GNOME desktop, opcionális de tervezett</td></tr>
     <tr><td>Tárolás</td><td>2× <code>mdadm RAID1</code>, opcionális <code>LVM</code>, <code>ext4</code></td></tr>
     <tr><td>Mount modell</td><td><code>/</code>, <code>/var</code>, <code>/opt</code>, valamint külön <code>/srv</code></td></tr>
     <tr><td>Publikus IP</td><td><code>195.199.215.1/29</code>, gateway: <code>195.199.215.6</code></td></tr>
@@ -450,8 +486,9 @@ restic backup /etc /srv/www /srv/data /srv/share /opt/apps</pre>
     <tr><td>DNS</td><td><code>195.199.255.57</code>, <code>195.199.255.58</code></td></tr>
     <tr><td>Web</td><td>Apache2 + PHP-FPM + WordPress + saját PHP appok</td></tr>
     <tr><td>Java</td><td>systemd service + Apache reverse proxy</td></tr>
-    <tr><td>Adatbázis</td><td>MariaDB localhost only</td></tr>
+    <tr><td>Adatbázis</td><td>MariaDB localhost only + phpMyAdmin belső/admin elérésre</td></tr>
     <tr><td>Megosztás</td><td>Samba csak belső hálón</td></tr>
+    <tr><td>Admin</td><td>Webmin csak belső hálóról</td></tr>
     <tr><td>Email</td><td>Microsoft Graph alapú küldés, nincs helyi mail szerver</td></tr>
     <tr><td>SSO</td><td>Entra ID / WPO365 integráció</td></tr>
     <tr><td>Backup</td><td>Lokális staging + külső/offsite mentés</td></tr>
@@ -470,6 +507,6 @@ restic backup /etc /srv/www /srv/data /srv/share /opt/apps</pre>
   </ol>
 
   <h2>22. Megjegyzés</h2>
-  <p>Ez a dokumentum már egy <strong>gyakorlatias, parancsokkal kiegészített v5 alapverzió</strong>, amelyre közvetlenül ráépíthető a tényleges telepítés.</p>
+  <p>Ez a dokumentum már egy <strong>gyakorlatias, parancsokkal kiegészített v5.1 alapverzió</strong>, Ubuntu 26.04 LTS-re, GNOME-mal, Webminnel és phpMyAdminnal tervezve.</p>
 </body>
 </html>
