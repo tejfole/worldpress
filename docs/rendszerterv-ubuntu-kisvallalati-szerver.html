@@ -5,10 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Rendszerterv – Ubuntu Server LTS alapú egygépes kisvállalati szerver</title>
   <style>
-    body { font-family: Arial, Helvetica, sans-serif; line-height: 1.5; color: #222; margin: 40px; }
+    body { font-family: Arial, Helvetica, sans-serif; line-height: 1.55; color: #222; margin: 40px; }
     h1, h2, h3 { color: #1f3b5b; }
     h1 { border-bottom: 3px solid #1f3b5b; padding-bottom: 8px; }
     h2 { border-left: 6px solid #1f3b5b; padding-left: 10px; margin-top: 30px; }
+    h3 { margin-top: 22px; }
     table { border-collapse: collapse; width: 100%; margin: 16px 0; }
     th, td { border: 1px solid #cfd8dc; padding: 10px; text-align: left; vertical-align: top; }
     th { background: #eceff1; }
@@ -20,12 +21,13 @@
     .note { background: #fff8e1; border-left: 5px solid #ffb300; padding: 10px 12px; margin: 16px 0; }
     .small { color: #555; font-size: 0.95em; }
     code { background: #f5f5f5; padding: 1px 4px; border-radius: 3px; }
-    ul { margin-top: 6px; }
+    pre { background: #f7f9fb; border: 1px solid #d9e2e8; padding: 12px; overflow-x: auto; }
+    ul, ol { margin-top: 6px; }
   </style>
 </head>
 <body>
   <h1>Rendszerterv – Ubuntu Server LTS alapú egygépes kisvállalati szerver</h1>
-  <p><strong>Verzió:</strong> v2<br />
+  <p><strong>Verzió:</strong> v4<br />
   <strong>Dátum:</strong> 2026-06-09<br />
   <strong>Cél:</strong> WordPress + saját PHP/Java alkalmazások + MariaDB + belső fájlmegosztás + backup + Microsoft 365 / Entra integráció</p>
 
@@ -94,312 +96,41 @@
     <li><strong>NIC2:</strong> adminisztráció, Samba, backup, belső szolgáltatások</li>
   </ul>
 
-  <h2>4. Tárolási terv</h2>
-  <p><strong>Javasolt topológia:</strong></p>
-
-  <h3 class="green">🟩 Rendszer tömb</h3>
+  <h2>4. Gyakorlati architektúra</h2>
+  <p>A szerver egy gépen futtatja az alábbi szerepköröket:</p>
   <ul>
-    <li><strong>SSD1 + SSD2 → mdadm RAID1</strong></li>
-    <li>feladata:
-      <ul>
-        <li>operációs rendszer</li>
-        <li>Apache</li>
-        <li>PHP-FPM</li>
-        <li>MariaDB</li>
-        <li>WordPress</li>
-        <li>Java alkalmazások</li>
-        <li>naplók</li>
-      </ul>
-    </li>
+    <li><strong>Publikus szolgáltatások:</strong> WordPress, saját PHP appok, saját Java appok Apache reverse proxy mögött</li>
+    <li><strong>Belső szolgáltatások:</strong> SSH admin, Samba, backup műveletek, opcionális belső admin végpontok</li>
+    <li><strong>Adatszolgáltatások:</strong> MariaDB, fájltárolás, mentési tárterület</li>
+    <li><strong>Integráció:</strong> Entra ID login, Microsoft Graph alapú email küldés</li>
   </ul>
 
-  <h3 class="orange">🟧 Adat tömb</h3>
+  <h2>5. Tárolási terv</h2>
+  <p><strong>Véglegesített gyakorlati modell:</strong></p>
   <ul>
-    <li><strong>SSD3 + SSD4 → mdadm RAID1</strong></li>
-    <li>feladata:
-      <ul>
-        <li>fájltárolás</li>
-        <li>Samba share-ek</li>
-        <li>alkalmazásadatok</li>
-        <li>backup staging</li>
-        <li>archívum</li>
-      </ul>
-    </li>
+    <li><strong>md0</strong> – rendszer: SSD1 + SSD2 → <code>mdadm RAID1</code></li>
+    <li><strong>md1</strong> – adat: SSD3 + SSD4 → <code>mdadm RAID1</code></li>
   </ul>
+  <p>Mindkét tömb kb. 232 GiB hasznos kapacitást ad.</p>
+
+  <h3 class="green">🟩 Rendszer tömb – <code>md0</code></h3>
+  <table>
+    <tr><th>Csatolás</th><th>Méret</th><th>Cél</th></tr>
+    <tr><td><code>/</code></td><td>60 GB</td><td>alap rendszer</td></tr>
+    <tr><td><code>/var</code></td><td>100 GB</td><td>MariaDB, logok, cache</td></tr>
+    <tr><td><code>/opt</code></td><td>maradék</td><td>Java appok, egyedi telepítések</td></tr>
+  </table>
+
+  <h3 class="orange">🟧 Adat tömb – <code>md1</code></h3>
+  <table>
+    <tr><th>Csatolás</th><th>Méret</th><th>Cél</th></tr>
+    <tr><td><code>/srv</code></td><td>teljes tömb</td><td>webhelyek, adatok, Samba, backup staging</td></tr>
+  </table>
 
   <p><strong>Technológiai javaslat:</strong> <code>mdadm</code> + opcionális <code>LVM</code> + <code>ext4</code></p>
+  <p><strong>Swap:</strong> külön partíció helyett <strong>8 GB swapfile</strong></p>
 
-  <table>
-    <tr><th colspan="3" class="green">Rendszer tömb</th></tr>
-    <tr><th>Csatolás</th><th>Méret</th><th>Cél</th></tr>
-    <tr><td><code>/boot</code></td><td>2 GB</td><td>boot</td></tr>
-    <tr><td><code>swap</code></td><td>8–16 GB</td><td>swap</td></tr>
-    <tr><td><code>/</code></td><td>40 GB</td><td>alap rendszer</td></tr>
-    <tr><td><code>/var</code></td><td>80 GB</td><td>MariaDB, logok, cache</td></tr>
-    <tr><td><code>/opt</code></td><td>40 GB</td><td>Java appok, egyedi telepítések</td></tr>
-    <tr><td><code>/srv/www</code></td><td>maradék</td><td>WordPress, PHP appok</td></tr>
-  </table>
-
-  <table>
-    <tr><th colspan="3" class="orange">Adat tömb</th></tr>
-    <tr><th>Csatolás</th><th>Méret</th><th>Cél</th></tr>
-    <tr><td><code>/srv/data</code></td><td>80 GB</td><td>alkalmazásadatok</td></tr>
-    <tr><td><code>/srv/share</code></td><td>80 GB</td><td>Samba megosztások</td></tr>
-    <tr><td><code>/srv/backup</code></td><td>maradék</td><td>lokális mentések</td></tr>
-  </table>
-
-  <h2>5. Hálózati terv</h2>
-  <h3 class="green">🟩 Publikus interfész – NIC1</h3>
-  <p>Feladata:</p>
-  <ul>
-    <li>publikus IP</li>
-    <li>alapértelmezett gateway</li>
-    <li>webes szolgáltatások kiszolgálása</li>
-  </ul>
-  <p><strong>Nyitott portok:</strong> <code>80/tcp</code>, <code>443/tcp</code></p>
-
-  <h3 class="blue">🟦 Belső interfész – NIC2</h3>
-  <p>Feladata:</p>
-  <ul>
-    <li>SSH admin</li>
-    <li>Samba</li>
-    <li>backup forgalom</li>
-    <li>belső szolgáltatások</li>
-  </ul>
-  <p><strong>Javasolt portok:</strong> <code>22/tcp</code>, <code>445/tcp</code>, <code>139/tcp</code></p>
-
-  <p><strong>Hálózati alapelv:</strong></p>
-  <ul>
-    <li><strong>SSH csak belső hálózaton</strong></li>
-    <li><strong>Samba csak belső hálózaton</strong></li>
-    <li><strong>MariaDB csak localhoston</strong></li>
-    <li><strong>Java appok ne legyenek közvetlenül publikusak</strong></li>
-    <li><strong>Apache legyen az egyetlen publikus belépési pont</strong></li>
-  </ul>
-
-  <h2>6. Szoftver stack</h2>
-  <h3>Operációs rendszer</h3>
-  <ul>
-    <li><strong>Ubuntu Server 24.04 LTS</strong> <span class="small">(konzervatív, kiforrott választás)</span></li>
-    <li>alternatívaként: <strong>Ubuntu Server 26.04 LTS</strong> új telepítéshez</li>
-  </ul>
-
-  <h3 class="green">🟩 Web és alkalmazás</h3>
-  <ul>
-    <li>Apache2</li>
-    <li>PHP-FPM</li>
-    <li>PHP modulok: php-mysql, php-xml, php-curl, php-gd, php-mbstring, php-zip, php-intl, php-bcmath, php-imagick <span class="small">(opcionális)</span></li>
-    <li>Certbot / ACME</li>
-    <li>mod_ssl, mod_headers, mod_rewrite, mod_proxy, mod_proxy_http, mod_proxy_fcgi</li>
-  </ul>
-
-  <h3 class="orange">🟧 Adatbázis</h3>
-  <ul>
-    <li>MariaDB Server</li>
-    <li>MariaDB Client</li>
-  </ul>
-
-  <h3 class="green">🟩 Java futtatókörnyezet</h3>
-  <ul>
-    <li>OpenJDK 21 LTS <span class="small">(ha az alkalmazások támogatják)</span></li>
-    <li>systemd service-ek</li>
-  </ul>
-
-  <h3 class="blue">🟦 Fájlmegosztás</h3>
-  <ul><li>Samba</li></ul>
-
-  <h3 class="red">🟥 Biztonság és üzemeltetés</h3>
-  <ul>
-    <li>openssh-server</li>
-    <li>chrony</li>
-    <li>unattended-upgrades</li>
-    <li>rsync</li>
-    <li>logrotate</li>
-    <li>fail2ban</li>
-    <li>ufw vagy nftables</li>
-  </ul>
-
-  <h3 class="orange">🟧 Backup</h3>
-  <ul>
-    <li>restic vagy borgbackup</li>
-    <li>mariadb-dump</li>
-    <li>rclone <span class="small">(ha külső mentés kell)</span></li>
-  </ul>
-
-  <h2>7. Szolgáltatási architektúra</h2>
-  <h3 class="green">🟩 Apache</h3>
-  <ul>
-    <li>HTTP/HTTPS végpontok kezelése</li>
-    <li>virtual hostok</li>
-    <li>TLS terminálás</li>
-    <li>PHP-FPM kiszolgálás</li>
-    <li>reverse proxy Java appok elé</li>
-  </ul>
-
-  <h3 class="green">🟩 PHP-FPM</h3>
-  <p>Ajánlott külön poolok:</p>
-  <ul>
-    <li><code>wordpress</code></li>
-    <li><code>app1</code></li>
-    <li><code>app2</code></li>
-  </ul>
-
-  <h3 class="green">🟩 WordPress</h3>
-  <ul>
-    <li>helye: <code>/srv/www/wordpress</code></li>
-    <li>külön Apache vhost</li>
-    <li>külön MariaDB adatbázis</li>
-    <li>külön DB user</li>
-    <li>külön mentési szabály</li>
-  </ul>
-
-  <h3 class="green">🟩 Saját PHP alkalmazások</h3>
-  <ul>
-    <li><code>/srv/www/app1</code></li>
-    <li><code>/srv/www/app2</code></li>
-  </ul>
-
-  <h3 class="green">🟩 Java alkalmazások</h3>
-  <ul>
-    <li><code>/opt/apps/app1</code></li>
-    <li><code>/opt/apps/app2</code></li>
-    <li>systemd service</li>
-    <li>localhost portok: <code>127.0.0.1:8081</code>, <code>127.0.0.1:8082</code></li>
-    <li>Apache reverse proxy mögött</li>
-  </ul>
-
-  <h2>8. Adatbázis terv</h2>
-  <h3 class="orange">🟧 MariaDB alapelvek</h3>
-  <ul>
-    <li>csak <strong>localhost</strong> elérés</li>
-    <li>külön adatbázis minden alkalmazáshoz</li>
-    <li>külön felhasználó minden alkalmazáshoz</li>
-    <li>root távoli belépés tiltva</li>
-    <li>karakterkészlet: <strong>utf8mb4</strong></li>
-  </ul>
-  <p><strong>Javasolt adatbázisok:</strong> <code>wordpress_db</code>, <code>app1_db</code>, <code>app2_db</code></p>
-  <p><strong>Erőforrás-javaslat:</strong> 16 GB RAM mellett induló cél: MariaDB <strong>2–4 GB</strong> memóriahasználat</p>
-
-  <h2>9. Microsoft 365 / Entra integráció</h2>
-  <h3 class="purple">🟪 Azonosítás</h3>
-  <ul>
-    <li>Entra ID alapú bejelentkezés WordPresshez</li>
-    <li>WPO365 vagy kompatibilis plugin</li>
-  </ul>
-
-  <h3 class="purple">🟪 Email küldés</h3>
-  <ul>
-    <li><strong>Microsoft Graph API</strong> használata</li>
-    <li>nincs helyi mail szerver</li>
-    <li>nincs <code>php mail()</code></li>
-    <li>nincs publikus SMTP szolgáltatás</li>
-  </ul>
-
-  <p><strong>Szükséges elemek:</strong></p>
-  <ul>
-    <li>Entra app registration</li>
-    <li>tenant ID</li>
-    <li>client ID</li>
-    <li>client secret vagy certificate</li>
-    <li>redirect URL-ek</li>
-    <li>Graph API engedélyek</li>
-  </ul>
-  <p>A WordPress csak <strong>küldésre</strong> használja a Microsoft 365 környezetet. A teljes levelezés az Office 365-ben marad.</p>
-
-  <h2>10. Samba és fájlmegosztás</h2>
-  <h3 class="blue">🟦 Szerep</h3>
-  <p>Csak belső hálózaton használható fájlmegosztás.</p>
-  <p><strong>Javasolt share-ek:</strong></p>
-  <ul>
-    <li><code>common</code></li>
-    <li><code>projects</code></li>
-    <li><code>exchange</code></li>
-    <li><code>backup-drop</code> <span class="small">(ha szükséges)</span></li>
-  </ul>
-  <p><strong>Javasolt könyvtárak:</strong></p>
-  <ul>
-    <li><code>/srv/share/common</code></li>
-    <li><code>/srv/share/projects</code></li>
-    <li><code>/srv/share/exchange</code></li>
-  </ul>
-  <ul>
-    <li>csak belső IP-n figyeljen</li>
-    <li>webroot ne legyen teljesen írható megosztásként kiexportálva</li>
-    <li>DB könyvtár ne legyen share-ként kitéve</li>
-  </ul>
-
-  <h2>11. Backup stratégia</h2>
-  <h3 class="orange">🟧 Lokális backup</h3>
-  <p>Napi mentés:</p>
-  <ul>
-    <li>MariaDB dump</li>
-    <li><code>/etc</code></li>
-    <li>Apache konfigurációk</li>
-    <li>PHP-FPM konfigurációk</li>
-    <li>WordPress fájlok</li>
-    <li>alkalmazáskönyvtárak</li>
-    <li>systemd unitok</li>
-  </ul>
-  <p><strong>Célkönyvtár:</strong> <code>/srv/backup/daily</code></p>
-
-  <h3 class="orange">🟧 Verziózott backup</h3>
-  <p>Ajánlott eszköz: <strong>restic</strong></p>
-  <p>Cél:</p>
-  <ul>
-    <li>lokális staging</li>
-    <li>külső NAS</li>
-    <li>S3 kompatibilis tároló</li>
-  </ul>
-  <p><strong>Minimum szabály:</strong></p>
-  <ul>
-    <li>napi mentés</li>
-    <li>heti ellenőrzés</li>
-    <li>havi restore teszt</li>
-    <li>legalább 1 külső/offsite másolat</li>
-  </ul>
-
-  <h2>12. Biztonsági baseline</h2>
-  <h3 class="red">🟥 SSH</h3>
-  <ul>
-    <li>root login tiltva</li>
-    <li>jelszavas login tiltva</li>
-    <li>kulcsos hitelesítés</li>
-    <li>csak belső interfész</li>
-  </ul>
-
-  <h3 class="red">🟥 Tűzfal</h3>
-  <p><strong>Publikus oldal:</strong> <code>80/tcp</code>, <code>443/tcp</code></p>
-  <p><strong>Belső oldal:</strong> <code>22/tcp</code>, <code>445/tcp</code>, <code>139/tcp</code></p>
-
-  <h3 class="red">🟥 Web biztonság</h3>
-  <ul>
-    <li>HTTPS only</li>
-    <li>directory listing tiltás</li>
-    <li>Apache modulok minimalizálása</li>
-    <li>PHP limitek kontrollja</li>
-    <li>WordPress admin védelem</li>
-  </ul>
-
-  <h3 class="red">🟥 Rendszer</h3>
-  <ul>
-    <li>automatikus security frissítések</li>
-    <li>fail2ban</li>
-    <li>időszinkron</li>
-    <li>naplófigyelés</li>
-  </ul>
-
-  <h2>13. Erőforrás-terv</h2>
-  <table>
-    <tr><th>Szolgáltatás</th><th>Javasolt memória</th></tr>
-    <tr><td>Alaprendszer + cache</td><td>2 GB</td></tr>
-    <tr><td>Apache + PHP-FPM</td><td>2–3 GB</td></tr>
-    <tr><td>MariaDB</td><td>2–4 GB</td></tr>
-    <tr><td>Java appok</td><td>4–6 GB</td></tr>
-    <tr><td>Tartalék / burst</td><td>maradék</td></tr>
-  </table>
-  <p>16 GB RAM-mal elindul a rendszer. Ha a Java alkalmazások nőnek, a <strong>32 GB RAM</strong> hosszabb távon jobb cél.</p>
-
-  <h2>14. Könyvtárstruktúra</h2>
+  <h2>6. Könyvtárstruktúra</h2>
   <h3 class="green">🟩 Web</h3>
   <ul>
     <li><code>/srv/www/wordpress</code></li>
@@ -411,13 +142,13 @@
     <li><code>/opt/apps/app1</code></li>
     <li><code>/opt/apps/app2</code></li>
   </ul>
-  <h3 class="orange">🟧 Adat</h3>
+  <h3 class="orange">🟧 Adatok</h3>
   <ul>
     <li><code>/srv/data/app1</code></li>
     <li><code>/srv/data/app2</code></li>
     <li><code>/srv/data/uploads</code></li>
   </ul>
-  <h3 class="blue">🟦 Megosztás</h3>
+  <h3 class="blue">🟦 Samba</h3>
   <ul>
     <li><code>/srv/share/common</code></li>
     <li><code>/srv/share/projects</code></li>
@@ -426,10 +157,55 @@
   <h3 class="orange">🟧 Backup</h3>
   <ul>
     <li><code>/srv/backup/daily</code></li>
-    <li><code>/srv/backup/restic-cache</code></li>
+    <li><code>/srv/backup/restic</code></li>
   </ul>
 
-  <h2>15. Porttérkép</h2>
+  <h2>7. Hálózati terv</h2>
+  <p><strong>Példa interfésznevek:</strong></p>
+  <ul>
+    <li><code>enp1s0</code> = publikus</li>
+    <li><code>enp2s0</code> = belső</li>
+  </ul>
+
+  <h3 class="green">🟩 Publikus NIC</h3>
+  <ul>
+    <li>IP: szolgáltatótól kapott statikus publikus IP</li>
+    <li>gateway: szolgáltatói gateway</li>
+    <li>DNS: pl. <code>1.1.1.1</code>, <code>8.8.8.8</code></li>
+  </ul>
+
+  <h3 class="blue">🟦 Belső NIC</h3>
+  <ul>
+    <li>IP: <code>192.168.10.10/24</code></li>
+    <li>gateway: nincs</li>
+  </ul>
+
+  <p><strong>Szabály:</strong> default route csak a publikus interfészen legyen. SSH és Samba csak a belső IP-ről legyen elérhető.</p>
+
+  <h3>Netplan minta</h3>
+  <pre>network:
+  version: 2
+  renderer: networkd
+
+  ethernets:
+    enp1s0:
+      dhcp4: false
+      addresses:
+        - 203.0.113.10/24
+      routes:
+        - to: default
+          via: 203.0.113.1
+      nameservers:
+        addresses:
+          - 1.1.1.1
+          - 8.8.8.8
+
+    enp2s0:
+      dhcp4: false
+      addresses:
+        - 192.168.10.10/24</pre>
+
+  <h2>8. Porttérkép</h2>
   <table>
     <tr><th>Port</th><th>Protokoll</th><th>Elérés</th><th>Funkció</th></tr>
     <tr><td>80</td><td>TCP</td><td>publikus</td><td>HTTP</td></tr>
@@ -442,30 +218,216 @@
     <tr><td>8082</td><td>TCP</td><td>localhost</td><td>Java app2</td></tr>
   </table>
 
-  <h2>16. Javasolt telepítési sorrend</h2>
+  <h2>9. Szolgáltatás-kiosztás</h2>
+  <h3 class="green">🟩 Apache</h3>
+  <ul>
+    <li>minden publikus webes bejövő kérés kezelése</li>
+    <li>TLS</li>
+    <li>reverse proxy</li>
+    <li>PHP oldalak kiszolgálása</li>
+  </ul>
+
+  <h3 class="green">🟩 PHP-FPM</h3>
+  <p>Külön poolok:</p>
+  <ul>
+    <li><code>wordpress</code></li>
+    <li><code>app1</code></li>
+    <li><code>app2</code></li>
+  </ul>
+  <p>Javasolt userek:</p>
+  <ul>
+    <li><code>wp-www</code></li>
+    <li><code>app1-www</code></li>
+    <li><code>app2-www</code></li>
+  </ul>
+
+  <h3 class="green">🟩 Java appok</h3>
+  <ul>
+    <li>service userek: <code>app1svc</code>, <code>app2svc</code></li>
+    <li>localhost portok: <code>127.0.0.1:8081</code>, <code>127.0.0.1:8082</code></li>
+    <li>Apache proxy mögött</li>
+  </ul>
+
+  <h3 class="orange">🟧 MariaDB</h3>
+  <ul>
+    <li>csak <code>127.0.0.1</code></li>
+    <li>külön DB user alkalmazásonként</li>
+  </ul>
+
+  <h2>10. Apache vhost modell</h2>
+  <ul>
+    <li><code>www.domain.hu</code> → WordPress</li>
+    <li><code>app1.domain.hu</code> → PHP app1</li>
+    <li><code>app2.domain.hu</code> → PHP app2</li>
+    <li><code>api.domain.hu</code> → Java app1 proxy</li>
+    <li><code>admin.domain.local</code> → opcionális belső admin</li>
+  </ul>
+  <p>Elv: minden site külön vhost, külön log, külön document root, külön PHP pool vagy proxy target, HTTPS mindenen.</p>
+
+  <h2>11. MariaDB terv</h2>
+  <p><strong>Adatbázisok:</strong></p>
+  <ul>
+    <li><code>wordpress_db</code></li>
+    <li><code>app1_db</code></li>
+    <li><code>app2_db</code></li>
+  </ul>
+  <p><strong>Userek:</strong></p>
+  <ul>
+    <li><code>wordpress_user</code></li>
+    <li><code>app1_user</code></li>
+    <li><code>app2_user</code></li>
+  </ul>
+  <p><strong>Beállítások:</strong> bind-address = <code>127.0.0.1</code>, karakterkészlet <code>utf8mb4</code>, root távoli login tiltva.</p>
+  <p><strong>Mentés:</strong> napi SQL dump, lokális retention legalább 7–14 nap.</p>
+
+  <h2>12. Samba terv</h2>
+  <p><strong>Share-ek:</strong></p>
+  <ul>
+    <li><code>common</code> – általános irodai fájlok</li>
+    <li><code>projects</code> – projektdokumentumok</li>
+    <li><code>exchange</code> – ideiglenes csereanyagok</li>
+  </ul>
+  <p><strong>Könyvtárak:</strong> <code>/srv/share/common</code>, <code>/srv/share/projects</code>, <code>/srv/share/exchange</code></p>
+  <p><strong>Jogosultsági csoportok:</strong> <code>office</code>, <code>projects</code>, opcionálisan <code>management</code></p>
+  <p><strong>Fontos szabály:</strong> WordPress vagy app source ne legyen általános SMB share.</p>
+
+  <h2>13. WordPress + Entra + Graph</h2>
+  <ul>
+    <li>WordPress külön könyvtárban, külön adatbázissal, külön PHP poollal</li>
+    <li>Entra login: WPO365 vagy hasonló plugin</li>
+    <li>Graph mail: contact form, jelszó-visszaállítás, admin riasztások</li>
+    <li>nincs helyi SMTP szerver</li>
+  </ul>
+  <p><strong>Külön figyelni kell:</strong> secret kezelés, plugin update kompatibilitás, token renewal.</p>
+
+  <h2>14. Backup terv</h2>
+  <p><strong>Mentendő elemek:</strong></p>
+  <ul>
+    <li><code>/etc</code></li>
+    <li><code>/srv/www</code></li>
+    <li><code>/srv/data</code></li>
+    <li><code>/srv/share</code></li>
+    <li><code>/opt/apps</code></li>
+    <li>MariaDB dumpok</li>
+    <li>Apache configok</li>
+    <li>PHP-FPM pool configok</li>
+    <li>Samba config</li>
+    <li>systemd unitok</li>
+  </ul>
+  <p><strong>Cél:</strong> <code>/srv/backup/daily</code></p>
+  <p><strong>Verziózott mentés:</strong> <code>restic</code> repository lokális staginggel, később külső célra szinkronizálva.</p>
+  <p><strong>Ütemezés:</strong></p>
+  <ul>
+    <li>naponta: DB dump, config mentés, fájlmentés</li>
+    <li>hetente: teljes backup ellenőrzés</li>
+    <li>havonta: restore teszt</li>
+  </ul>
+
+  <h2>15. Biztonsági baseline</h2>
+  <h3 class="red">🟥 SSH</h3>
+  <ul>
+    <li>csak belső NIC</li>
+    <li>root tiltva</li>
+    <li>password auth tiltva</li>
+    <li>key auth</li>
+  </ul>
+
+  <h3 class="red">🟥 Tűzfal</h3>
+  <p><strong>Publikus:</strong> allow 80, allow 443, minden más tiltva.</p>
+  <p><strong>Belső:</strong> allow 22/445/139 a <code>192.168.10.0/24</code> hálózatból.</p>
+
+  <h3 class="red">🟥 Egyéb</h3>
+  <ul>
+    <li>MariaDB localhost only</li>
+    <li>Samba: interfaces = belső NIC, bind interfaces only = yes</li>
+    <li>Apache/PHP: server tokens off, directory listing off, szükségtelen modulok off</li>
+  </ul>
+
+  <h2>16. Csomaglista</h2>
+  <h3>Alap</h3>
+  <ul>
+    <li>openssh-server</li>
+    <li>curl</li>
+    <li>wget</li>
+    <li>vim vagy nano</li>
+    <li>htop</li>
+    <li>ncdu</li>
+    <li>unzip</li>
+    <li>rsync</li>
+    <li>chrony</li>
+    <li>ufw</li>
+    <li>fail2ban</li>
+    <li>unattended-upgrades</li>
+  </ul>
+
+  <h3>Storage</h3>
+  <ul>
+    <li>mdadm</li>
+    <li>lvm2</li>
+  </ul>
+
+  <h3>Web</h3>
+  <ul>
+    <li>apache2</li>
+    <li>php-fpm</li>
+    <li>php-mysql</li>
+    <li>php-xml</li>
+    <li>php-curl</li>
+    <li>php-gd</li>
+    <li>php-mbstring</li>
+    <li>php-zip</li>
+    <li>php-intl</li>
+    <li>php-bcmath</li>
+    <li>php-imagick</li>
+  </ul>
+
+  <h3>DB</h3>
+  <ul>
+    <li>mariadb-server</li>
+    <li>mariadb-client</li>
+  </ul>
+
+  <h3>Java</h3>
+  <ul>
+    <li>openjdk-21-jre-headless</li>
+  </ul>
+
+  <h3>Share</h3>
+  <ul>
+    <li>samba</li>
+  </ul>
+
+  <h3>Backup</h3>
+  <ul>
+    <li>restic</li>
+  </ul>
+
+  <h2>17. Telepítési sorrend</h2>
   <ol>
-    <li>Hardver ellenőrzés, BIOS/UEFI beállítás</li>
-    <li>Ubuntu Server telepítés</li>
-    <li><code>mdadm</code> + opcionális <code>LVM</code> + <code>ext4</code> kialakítás</li>
-    <li>Hálózat konfigurálása</li>
-    <li>SSH és admin hardening</li>
-    <li>Apache + PHP-FPM telepítés</li>
-    <li>MariaDB telepítés és hardening</li>
-    <li>WordPress telepítés</li>
-    <li>PHP appok telepítése</li>
-    <li>Java runtime és app service-ek telepítése</li>
-    <li>Samba konfigurálása</li>
-    <li>Backup folyamatok kialakítása</li>
-    <li>Entra / Microsoft Graph integráció</li>
-    <li>TLS / domain / DNS beállítás</li>
-    <li>Tesztelés és dokumentálás</li>
+    <li>Ubuntu Server 24.04 LTS tiszta telepítés</li>
+    <li>Hálózati interfésznevek és IP-k ellenőrzése</li>
+    <li><code>mdadm</code> RAID1 tömbök kialakítása</li>
+    <li>fájlrendszerek létrehozása, mountok, <code>fstab</code></li>
+    <li>swapfile létrehozása</li>
+    <li>alapcsomagok + hardening</li>
+    <li>Apache + PHP-FPM</li>
+    <li>MariaDB + hardening</li>
+    <li>WordPress alaptelepítés</li>
+    <li>PHP appok</li>
+    <li>Java runtime + service-ek</li>
+    <li>Samba</li>
+    <li>backup</li>
+    <li>TLS / domain / DNS</li>
+    <li>Entra / Graph integráció</li>
+    <li>tesztek és dokumentálás</li>
   </ol>
 
-  <h2>17. Végső ajánlott v2 profil</h2>
+  <h2>18. Végső ajánlott v4 profil</h2>
   <table>
     <tr><th>Terület</th><th>Ajánlás</th></tr>
     <tr><td>Operációs rendszer</td><td>Ubuntu Server 24.04 LTS</td></tr>
     <tr><td>Tárolás</td><td>2× <code>mdadm RAID1</code>, opcionális <code>LVM</code>, <code>ext4</code></td></tr>
+    <tr><td>Mount modell</td><td><code>/</code>, <code>/var</code>, <code>/opt</code>, valamint külön <code>/srv</code></td></tr>
     <tr><td>Web</td><td>Apache2 + PHP-FPM + WordPress + saját PHP appok</td></tr>
     <tr><td>Java</td><td>systemd service + Apache reverse proxy</td></tr>
     <tr><td>Adatbázis</td><td>MariaDB localhost only</td></tr>
@@ -476,19 +438,19 @@
     <tr><td>Biztonság</td><td>SSH internal only, UFW/nftables, fail2ban, TLS</td></tr>
   </table>
 
-  <h2>18. Következő lépések</h2>
-  <p>A rendszerterv alapján a következő dokumentumok készíthetők el:</p>
+  <h2>19. Következő lépések</h2>
   <ol>
-    <li>telepítési checklist</li>
-    <li>konkrét netplan hálózati konfiguráció</li>
-    <li>RAID/LVM kiosztási terv parancsokkal</li>
-    <li>Apache virtual host terv</li>
-    <li>MariaDB hardening és backup script terv</li>
-    <li>Samba konfigurációs javaslat</li>
-    <li>WordPress + Entra + Graph integrációs lépések</li>
+    <li>Storage telepítési terv parancsokkal</li>
+    <li>Netplan kész minta valós IP-kkel</li>
+    <li>UFW szabályok</li>
+    <li>Apache vhost minták</li>
+    <li>PHP-FPM pool minták</li>
+    <li>Samba minta</li>
+    <li>Backup script / cron minta</li>
+    <li>Telepítési checklist</li>
   </ol>
 
-  <h2>19. Megjegyzés</h2>
-  <p>Ez a dokumentum <strong>első körös rendszerterv</strong>, amely jó alapot ad a telepítéshez és a részletes konfigurációs tervek kidolgozásához. A végleges kialakítást érdemes a tényleges domainek, IP-címek, alkalmazásszám és backup célok ismeretében véglegesíteni.</p>
+  <h2>20. Megjegyzés</h2>
+  <p>Ez a dokumentum már egy <strong>gyakorlatias, megépíthető v4 alapverzió</strong>, amelyre a konkrét telepítési és konfigurációs lépések közvetlenül ráépíthetők.</p>
 </body>
 </html>
