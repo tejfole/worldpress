@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Telepítési checklist – Ubuntu Server 26.04 LTS kisvállalati szerver</title>
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; line-height: 1.6; color: #222; margin: 40px; }
+    h1, h2, h3 { color: #1f3b5b; }
+    h1 { border-bottom: 3px solid #1f3b5b; padding-bottom: 8px; }
+    h2 { border-left: 6px solid #1f3b5b; padding-left: 10px; margin-top: 30px; }
+    table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+    th, td { border: 1px solid #cfd8dc; padding: 10px; text-align: left; vertical-align: top; }
+    th { background: #eceff1; }
+    code { background: #f5f5f5; padding: 1px 4px; border-radius: 3px; }
+    pre { background: #f7f9fb; border: 1px solid #d9e2e8; padding: 12px; overflow-x: auto; white-space: pre-wrap; }
+    .note { background: #fff8e1; border-left: 5px solid #ffb300; padding: 10px 12px; margin: 16px 0; }
+    ul, ol { margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <h1>Telepítési checklist – Ubuntu Server 26.04 LTS kisvállalati szerver</h1>
+  <p><strong>Verzió:</strong> v1<br />
+  <strong>Dátum:</strong> 2026-06-09<br />
+  <strong>Cél:</strong> letölthető, külön telepítési lista a rendszerterv mellé</p>
+
+  <div class="note">
+    Ez a dokumentum a <code>rendszerterv-ubuntu-kisvallalati-szerver.html</code> mellé készült külön, letölthető telepítési checklistként.
+  </div>
+
+  <h2>1. Kiinduló adatok</h2>
+  <table>
+    <tr><th>Elem</th><th>Érték</th></tr>
+    <tr><td>Operációs rendszer</td><td>Ubuntu Server 26.04 LTS</td></tr>
+    <tr><td>Publikus IP</td><td><code>195.199.215.1/29</code></td></tr>
+    <tr><td>Publikus gateway</td><td><code>195.199.215.6</code></td></tr>
+    <tr><td>DNS</td><td><code>195.199.255.57</code>, <code>195.199.255.58</code></td></tr>
+    <tr><td>Belső IP</td><td><code>10.1.200.10/16</code></td></tr>
+    <tr><td>Belső hálózat</td><td><code>10.1.0.0/16</code></td></tr>
+    <tr><td>Storage</td><td>4 × 250 GB SSD, 2 × <code>mdadm RAID1</code></td></tr>
+    <tr><td>GUI</td><td>GNOME</td></tr>
+    <tr><td>Admin</td><td>Webmin, phpMyAdmin</td></tr>
+  </table>
+
+  <h2>2. Előkészítés</h2>
+  <ul>
+    <li>[ ] Ubuntu Server 26.04 LTS telepítő elkészítve</li>
+    <li>[ ] 4 SSD fizikailag beszerelve</li>
+    <li>[ ] publikus NIC csatlakoztatva</li>
+    <li>[ ] belső NIC csatlakoztatva</li>
+    <li>[ ] BIOS/UEFI: UEFI boot bekapcsolva</li>
+    <li>[ ] SATA mód: AHCI</li>
+    <li>[ ] alaplapi fake RAID kikapcsolva / nem használva</li>
+  </ul>
+
+  <h2>3. Telepítés közbeni storage célkép</h2>
+  <ul>
+    <li>[ ] SSD1 + SSD2 → rendszer RAID1</li>
+    <li>[ ] SSD3 + SSD4 → adat RAID1</li>
+    <li>[ ] EFI partíció mindkét rendszerlemezen</li>
+    <li>[ ] rendszer tömbön: <code>/</code>, <code>/var</code>, <code>/opt</code></li>
+    <li>[ ] adat tömbön: <code>/srv</code></li>
+    <li>[ ] swapfile használata külön swap partíció helyett</li>
+  </ul>
+
+  <h2>4. Első boot utáni ellenőrzés</h2>
+  <pre>ip a
+ip r
+hostnamectl
+timedatectl
+lsblk
+cat /proc/mdstat
+df -h</pre>
+  <ul>
+    <li>[ ] mindkét NIC látszik</li>
+    <li>[ ] RAID tömbök összeálltak</li>
+    <li>[ ] mountpontok helyesek</li>
+  </ul>
+
+  <h2>5. Netplan véglegesítés</h2>
+  <pre>network:
+  version: 2
+  renderer: networkd
+
+  ethernets:
+    enp1s0:
+      dhcp4: false
+      addresses:
+        - 195.199.215.1/29
+      routes:
+        - to: default
+          via: 195.199.215.6
+      nameservers:
+        addresses:
+          - 195.199.255.57
+          - 195.199.255.58
+
+    enp2s0:
+      dhcp4: false
+      addresses:
+        - 10.1.200.10/16</pre>
+
+  <pre>sudo nano /etc/netplan/01-server.yaml
+sudo netplan generate
+sudo netplan try
+sudo netplan apply
+ip a
+ip r
+resolvectl status</pre>
+
+  <ul>
+    <li>[ ] publikus IP működik</li>
+    <li>[ ] default route a publikus NIC-en van</li>
+    <li>[ ] belső IP működik</li>
+    <li>[ ] DNS feloldás működik</li>
+  </ul>
+
+  <h2>6. Alapcsomagok</h2>
+  <pre>sudo apt update
+sudo apt full-upgrade -y
+sudo apt install -y \
+  curl wget vim nano htop ncdu unzip rsync chrony \
+  ufw fail2ban unattended-upgrades \
+  mdadm lvm2 \
+  apache2 php-fpm php-mysql php-xml php-curl php-gd php-mbstring php-zip php-intl php-bcmath php-imagick \
+  mariadb-server mariadb-client \
+  openjdk-21-jre-headless \
+  samba restic \
+  ubuntu-desktop phpmyadmin</pre>
+
+  <ul>
+    <li>[ ] rendszer frissítve</li>
+    <li>[ ] alapcsomagok telepítve</li>
+    <li>[ ] GNOME telepítve</li>
+    <li>[ ] phpMyAdmin telepítve</li>
+  </ul>
+
+  <h2>7. SSH hardening</h2>
+  <pre>sudo nano /etc/ssh/sshd_config</pre>
+  <pre>PermitRootLogin no
+PasswordAuthentication no
+PubkeyAuthentication yes
+ListenAddress 10.1.200.10</pre>
+  <pre>sudo systemctl restart ssh
+sudo systemctl status ssh</pre>
+  <ul>
+    <li>[ ] kulcsos SSH belépés működik</li>
+    <li>[ ] root login tiltva</li>
+    <li>[ ] jelszavas login tiltva</li>
+  </ul>
+
+  <h2>8. Tűzfal</h2>
+  <pre>sudo ufw default deny incoming
+sudo ufw default allow outgoing
+
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+
+sudo ufw allow from 10.1.0.0/16 to any port 22 proto tcp
+sudo ufw allow from 10.1.0.0/16 to any port 139 proto tcp
+sudo ufw allow from 10.1.0.0/16 to any port 445 proto tcp
+sudo ufw allow from 10.1.0.0/16 to any port 10000 proto tcp
+
+sudo ufw enable
+sudo ufw status verbose</pre>
+  <ul>
+    <li>[ ] 80/443 publikus</li>
+    <li>[ ] 22/139/445/10000 csak belső hálóról</li>
+    <li>[ ] UFW aktív</li>
+  </ul>
+
+  <h2>9. Apache + PHP-FPM</h2>
+  <pre>sudo a2enmod ssl headers rewrite proxy proxy_http proxy_fcgi setenvif auth_basic
+sudo systemctl restart apache2</pre>
+  <pre>sudo mkdir -p /srv/www/wordpress
+sudo mkdir -p /srv/www/app1
+sudo mkdir -p /srv/www/app2
+sudo mkdir -p /opt/apps/app1
+sudo mkdir -p /opt/apps/app2</pre>
+  <ul>
+    <li>[ ] Apache modulok bekapcsolva</li>
+    <li>[ ] web könyvtárak létrehozva</li>
+    <li>[ ] PHP-FPM működik</li>
+  </ul>
+
+  <h2>10. MariaDB + phpMyAdmin</h2>
+  <pre>sudo mysql_secure_installation
+sudo ss -tulpn | grep 3306</pre>
+  <ul>
+    <li>[ ] MariaDB hardening kész</li>
+    <li>[ ] MariaDB csak localhoston figyel</li>
+    <li>[ ] phpMyAdmin nem publikus</li>
+  </ul>
+
+  <h2>11. WordPress</h2>
+  <ul>
+    <li>[ ] WordPress a <code>/srv/www/wordpress</code> alatt</li>
+    <li>[ ] külön adatbázis</li>
+    <li>[ ] külön vhost</li>
+    <li>[ ] HTTPS terv kész</li>
+  </ul>
+
+  <h2>12. Java alkalmazások</h2>
+  <ul>
+    <li>[ ] Java telepítve</li>
+    <li>[ ] app1 könyvtár: <code>/opt/apps/app1</code></li>
+    <li>[ ] app2 könyvtár: <code>/opt/apps/app2</code></li>
+    <li>[ ] systemd service terv kész</li>
+    <li>[ ] localhost portok használata</li>
+  </ul>
+
+  <h2>13. Samba</h2>
+  <pre>sudo mkdir -p /srv/share/common
+sudo mkdir -p /srv/share/projects
+sudo mkdir -p /srv/share/exchange
+sudo groupadd office
+sudo groupadd projects</pre>
+  <ul>
+    <li>[ ] Samba könyvtárak létrehozva</li>
+    <li>[ ] csoportok létrehozva</li>
+    <li>[ ] Samba csak belső interfészen</li>
+  </ul>
+
+  <h2>14. Webmin</h2>
+  <div class="note">
+    A Webmin telepítését a hivatalos Webmin repository alapján érdemes elvégezni. A terv szerint csak a belső hálózatról lesz elérhető a <code>10000/tcp</code> porton.
+  </div>
+  <ul>
+    <li>[ ] Webmin telepítve</li>
+    <li>[ ] csak belső hálóról elérhető</li>
+  </ul>
+
+  <h2>15. Backup</h2>
+  <pre>sudo mkdir -p /srv/backup/daily
+sudo mkdir -p /srv/backup/restic
+
+export RESTIC_REPOSITORY=/srv/backup/restic
+export RESTIC_PASSWORD='eros-jelszo'
+restic init
+restic backup /etc /srv/www /srv/data /srv/share /opt/apps
+restic snapshots</pre>
+  <pre>mysqldump --single-transaction --routines --events --databases wordpress_db app1_db app2_db &gt; /srv/backup/daily/db-$(date +%F).sql</pre>
+  <ul>
+    <li>[ ] restic inicializálva</li>
+    <li>[ ] első backup lefutott</li>
+    <li>[ ] DB dump működik</li>
+  </ul>
+
+  <h2>16. Végső ellenőrzés</h2>
+  <ul>
+    <li>[ ] rendszer frissített</li>
+    <li>[ ] időszinkron rendben</li>
+    <li>[ ] RAID rendben</li>
+    <li>[ ] hálózat rendben</li>
+    <li>[ ] SSH csak belsőn</li>
+    <li>[ ] UFW aktív</li>
+    <li>[ ] fail2ban aktív</li>
+    <li>[ ] Apache fut</li>
+    <li>[ ] MariaDB fut</li>
+    <li>[ ] Webmin csak belsőn</li>
+    <li>[ ] phpMyAdmin csak belső/admin elérésre</li>
+    <li>[ ] Samba fut</li>
+    <li>[ ] backup működik</li>
+  </ul>
+
+  <h2>17. Kapcsolódó fájl</h2>
+  <p>A fő rendszerterv dokumentum:</p>
+  <p><code>docs/rendszerterv-ubuntu-kisvallalati-szerver.html</code></p>
+</body>
+</html>
