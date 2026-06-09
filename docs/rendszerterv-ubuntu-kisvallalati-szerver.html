@@ -27,7 +27,7 @@
 </head>
 <body>
   <h1>Rendszerterv – Ubuntu Server LTS alapú egygépes kisvállalati szerver</h1>
-  <p><strong>Verzió:</strong> v4<br />
+  <p><strong>Verzió:</strong> v4.1<br />
   <strong>Dátum:</strong> 2026-06-09<br />
   <strong>Cél:</strong> WordPress + saját PHP/Java alkalmazások + MariaDB + belső fájlmegosztás + backup + Microsoft 365 / Entra integráció</p>
 
@@ -169,14 +169,17 @@
 
   <h3 class="green">🟩 Publikus NIC</h3>
   <ul>
-    <li>IP: szolgáltatótól kapott statikus publikus IP</li>
-    <li>gateway: szolgáltatói gateway</li>
-    <li>DNS: pl. <code>1.1.1.1</code>, <code>8.8.8.8</code></li>
+    <li>IP: <code>195.199.215.1/29</code></li>
+    <li>netmask: <code>255.255.255.248</code></li>
+    <li>gateway: <code>195.199.215.6</code></li>
+    <li>DNS: <code>195.199.255.57</code>, <code>195.199.255.58</code></li>
   </ul>
 
   <h3 class="blue">🟦 Belső NIC</h3>
   <ul>
-    <li>IP: <code>192.168.10.10/24</code></li>
+    <li>IP: <code>10.1.200.10/16</code></li>
+    <li>netmask: <code>255.255.0.0</code></li>
+    <li>belső hálózat: <code>10.1.0.0/16</code></li>
     <li>gateway: nincs</li>
   </ul>
 
@@ -191,19 +194,26 @@
     enp1s0:
       dhcp4: false
       addresses:
-        - 203.0.113.10/24
+        - 195.199.215.1/29
       routes:
         - to: default
-          via: 203.0.113.1
+          via: 195.199.215.6
       nameservers:
         addresses:
-          - 1.1.1.1
-          - 8.8.8.8
+          - 195.199.255.57
+          - 195.199.255.58
 
     enp2s0:
       dhcp4: false
       addresses:
-        - 192.168.10.10/24</pre>
+        - 10.1.200.10/16</pre>
+
+  <h3>Gyakorlati ellenőrzés</h3>
+  <ul>
+    <li>A <code>195.199.215.1/29</code> cím egy érvényes host cím a <code>195.199.215.0/29</code> hálózatban.</li>
+    <li>A használható hosttartomány: <code>195.199.215.1</code> – <code>195.199.215.6</code>.</li>
+    <li>A hálózati cím: <code>195.199.215.0</code>, a broadcast cím: <code>195.199.215.7</code>.</li>
+  </ul>
 
   <h2>8. Porttérkép</h2>
   <table>
@@ -218,7 +228,22 @@
     <tr><td>8082</td><td>TCP</td><td>localhost</td><td>Java app2</td></tr>
   </table>
 
-  <h2>9. Szolgáltatás-kiosztás</h2>
+  <h2>9. Tűzfal és elérési szabályok</h2>
+  <p><strong>Publikus oldal:</strong> csak <code>80/tcp</code> és <code>443/tcp</code>.</p>
+  <p><strong>Belső oldal:</strong> csak a <code>10.1.0.0/16</code> hálózatból legyen engedélyezve az SSH és a Samba.</p>
+  <pre>sudo ufw default deny incoming
+sudo ufw default allow outgoing
+
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+
+sudo ufw allow from 10.1.0.0/16 to any port 22 proto tcp
+sudo ufw allow from 10.1.0.0/16 to any port 445 proto tcp
+sudo ufw allow from 10.1.0.0/16 to any port 139 proto tcp
+
+sudo ufw enable</pre>
+
+  <h2>10. Szolgáltatás-kiosztás</h2>
   <h3 class="green">🟩 Apache</h3>
   <ul>
     <li>minden publikus webes bejövő kérés kezelése</li>
@@ -254,7 +279,7 @@
     <li>külön DB user alkalmazásonként</li>
   </ul>
 
-  <h2>10. Apache vhost modell</h2>
+  <h2>11. Apache vhost modell</h2>
   <ul>
     <li><code>www.domain.hu</code> → WordPress</li>
     <li><code>app1.domain.hu</code> → PHP app1</li>
@@ -264,7 +289,7 @@
   </ul>
   <p>Elv: minden site külön vhost, külön log, külön document root, külön PHP pool vagy proxy target, HTTPS mindenen.</p>
 
-  <h2>11. MariaDB terv</h2>
+  <h2>12. MariaDB terv</h2>
   <p><strong>Adatbázisok:</strong></p>
   <ul>
     <li><code>wordpress_db</code></li>
@@ -280,7 +305,7 @@
   <p><strong>Beállítások:</strong> bind-address = <code>127.0.0.1</code>, karakterkészlet <code>utf8mb4</code>, root távoli login tiltva.</p>
   <p><strong>Mentés:</strong> napi SQL dump, lokális retention legalább 7–14 nap.</p>
 
-  <h2>12. Samba terv</h2>
+  <h2>13. Samba terv</h2>
   <p><strong>Share-ek:</strong></p>
   <ul>
     <li><code>common</code> – általános irodai fájlok</li>
@@ -290,8 +315,10 @@
   <p><strong>Könyvtárak:</strong> <code>/srv/share/common</code>, <code>/srv/share/projects</code>, <code>/srv/share/exchange</code></p>
   <p><strong>Jogosultsági csoportok:</strong> <code>office</code>, <code>projects</code>, opcionálisan <code>management</code></p>
   <p><strong>Fontos szabály:</strong> WordPress vagy app source ne legyen általános SMB share.</p>
+  <pre>interfaces = lo enp2s0 10.1.200.10/16
+bind interfaces only = yes</pre>
 
-  <h2>13. WordPress + Entra + Graph</h2>
+  <h2>14. WordPress + Entra + Graph</h2>
   <ul>
     <li>WordPress külön könyvtárban, külön adatbázissal, külön PHP poollal</li>
     <li>Entra login: WPO365 vagy hasonló plugin</li>
@@ -300,7 +327,7 @@
   </ul>
   <p><strong>Külön figyelni kell:</strong> secret kezelés, plugin update kompatibilitás, token renewal.</p>
 
-  <h2>14. Backup terv</h2>
+  <h2>15. Backup terv</h2>
   <p><strong>Mentendő elemek:</strong></p>
   <ul>
     <li><code>/etc</code></li>
@@ -323,27 +350,24 @@
     <li>havonta: restore teszt</li>
   </ul>
 
-  <h2>15. Biztonsági baseline</h2>
+  <h2>16. Biztonsági baseline</h2>
   <h3 class="red">🟥 SSH</h3>
   <ul>
     <li>csak belső NIC</li>
     <li>root tiltva</li>
     <li>password auth tiltva</li>
     <li>key auth</li>
+    <li>ajánlott <code>ListenAddress 10.1.200.10</code></li>
   </ul>
-
-  <h3 class="red">🟥 Tűzfal</h3>
-  <p><strong>Publikus:</strong> allow 80, allow 443, minden más tiltva.</p>
-  <p><strong>Belső:</strong> allow 22/445/139 a <code>192.168.10.0/24</code> hálózatból.</p>
 
   <h3 class="red">🟥 Egyéb</h3>
   <ul>
     <li>MariaDB localhost only</li>
-    <li>Samba: interfaces = belső NIC, bind interfaces only = yes</li>
+    <li>Apache lehet minden interfészen, de tűzfallal korlátozva; szigorúbb megoldásnál csak a publikus IP-n figyeljen</li>
     <li>Apache/PHP: server tokens off, directory listing off, szükségtelen modulok off</li>
   </ul>
 
-  <h2>16. Csomaglista</h2>
+  <h2>17. Csomaglista</h2>
   <h3>Alap</h3>
   <ul>
     <li>openssh-server</li>
@@ -402,7 +426,7 @@
     <li>restic</li>
   </ul>
 
-  <h2>17. Telepítési sorrend</h2>
+  <h2>18. Telepítési sorrend</h2>
   <ol>
     <li>Ubuntu Server 24.04 LTS tiszta telepítés</li>
     <li>Hálózati interfésznevek és IP-k ellenőrzése</li>
@@ -422,12 +446,14 @@
     <li>tesztek és dokumentálás</li>
   </ol>
 
-  <h2>18. Végső ajánlott v4 profil</h2>
+  <h2>19. Végső ajánlott v4.1 profil</h2>
   <table>
     <tr><th>Terület</th><th>Ajánlás</th></tr>
     <tr><td>Operációs rendszer</td><td>Ubuntu Server 24.04 LTS</td></tr>
     <tr><td>Tárolás</td><td>2× <code>mdadm RAID1</code>, opcionális <code>LVM</code>, <code>ext4</code></td></tr>
     <tr><td>Mount modell</td><td><code>/</code>, <code>/var</code>, <code>/opt</code>, valamint külön <code>/srv</code></td></tr>
+    <tr><td>Publikus IP</td><td><code>195.199.215.1/29</code>, gateway: <code>195.199.215.6</code></td></tr>
+    <tr><td>Belső IP</td><td><code>10.1.200.10/16</code></td></tr>
     <tr><td>Web</td><td>Apache2 + PHP-FPM + WordPress + saját PHP appok</td></tr>
     <tr><td>Java</td><td>systemd service + Apache reverse proxy</td></tr>
     <tr><td>Adatbázis</td><td>MariaDB localhost only</td></tr>
@@ -438,10 +464,10 @@
     <tr><td>Biztonság</td><td>SSH internal only, UFW/nftables, fail2ban, TLS</td></tr>
   </table>
 
-  <h2>19. Következő lépések</h2>
+  <h2>20. Következő lépések</h2>
   <ol>
     <li>Storage telepítési terv parancsokkal</li>
-    <li>Netplan kész minta valós IP-kkel</li>
+    <li>Netplan kész fájl végleges interfésznevekkel</li>
     <li>UFW szabályok</li>
     <li>Apache vhost minták</li>
     <li>PHP-FPM pool minták</li>
@@ -450,7 +476,7 @@
     <li>Telepítési checklist</li>
   </ol>
 
-  <h2>20. Megjegyzés</h2>
-  <p>Ez a dokumentum már egy <strong>gyakorlatias, megépíthető v4 alapverzió</strong>, amelyre a konkrét telepítési és konfigurációs lépések közvetlenül ráépíthetők.</p>
+  <h2>21. Megjegyzés</h2>
+  <p>Ez a dokumentum már egy <strong>gyakorlatias, megépíthető v4.1 alapverzió</strong>, valós hálózati adatokkal kiegészítve.</p>
 </body>
 </html>
