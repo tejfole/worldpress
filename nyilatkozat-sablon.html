@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jelentkezési lap - iskolai közösségi szolgálatra</title>
+<style>
+  @page {
+    size: A4;
+    margin: 23.6mm 25mm 4.9mm 22.5mm;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #fff;
+    color: #000;
+    font-family: Calibri, Arial, sans-serif;
+    font-size: 11pt;
+    line-height: 1.25;
+  }
+
+  .page {
+    width: 100%;
+    max-width: 210mm;
+    margin: 0 auto;
+  }
+
+  h1 {
+    margin: 0 0 9mm 0;
+    text-align: center;
+    font-size: 14pt;
+    font-weight: 400;
+  }
+
+  p {
+    margin: 0 0 4.2mm 0;
+    text-align: justify;
+  }
+
+  .intro { margin-bottom: 4.5mm; }
+
+  ol.service-list {
+    margin: 0 0 2.5mm 11mm;
+    padding-left: 8mm;
+    list-style-position: outside;
+  }
+
+  ol.service-list > li {
+    margin: 0 0 3.1mm 0;
+    padding-left: 1.5mm;
+    text-align: left;
+  }
+
+  .hint {
+    margin: 0 0 5mm 0;
+    font-style: italic;
+    text-align: left;
+  }
+
+  .legal-note {
+    margin-top: 0;
+    margin-bottom: 7mm;
+  }
+
+  .consent { margin-bottom: 4.5mm; }
+
+  .consent-note {
+    margin-top: -1.5mm;
+    margin-bottom: 10mm;
+    font-style: italic;
+    text-align: left;
+  }
+
+  .date {
+    margin-top: 8mm;
+    margin-bottom: 17mm;
+    text-align: left;
+  }
+
+  .signature {
+    width: 78mm;
+    margin-left: auto;
+    text-align: center;
+  }
+
+  .signature-line {
+    margin-bottom: 1mm;
+    letter-spacing: .3px;
+  }
+
+  .signature-label { text-align: center; }
+
+  @media print {
+    body {
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .page { max-width: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>Jelentkezési lap - iskolai közösségi szolgálatra</h1>
+
+  <p class="intro">
+    Alulírott {{tanulo_neve}} a Budapest I. Kerületi Szilágyi Erzsébet Gimnázium
+    {{osztaly}} osztályos tanulója a {{tanev}}-as tanévtől az iskolai éveim során
+    az alábbi területeken kívánok eleget tenni az összesen 50 óra közösségi szolgálatnak:
+  </p>
+
+  <ol class="service-list">
+    <li>{{eu}} <em>az egészségügyi területen</em></li>
+    <li>{{szoc}} <em>a szociális és jótékonysági területen</em></li>
+    <li>{{okt}} az oktatási területen</li>
+    <li>{{kult}} a kulturális és közösségi területen</li>
+    <li>{{katasztrofa}} a katasztrófavédelmi területen</li>
+    <li>{{kornyezet}} a környezet- és természetvédelemi területen</li>
+    <li>{{ovoda}} az óvodás korú, sajátos nevelési igényű gyermekekkel, tanulókkal,
+        az idős emberekkel közös sport- és szabadidős tevékenység</li>
+    <li>{{bun}} <em>bűn- és baleset-megelőzési területen</em> folytatható tevékenység</li>
+  </ol>
+
+  <p class="hint">(x-szel jelölendő)</p>
+
+  <p class="legal-note">
+    (A végrehajtási rendelet szövege szerint a három dőlt betűvel szedett területen:
+    az egészségügyi területen és a bűn-és baleset megelőzési területen minden esetben,
+    a szociális területen pedig meghatározott esetekben szükség szerint mentort kell biztosítani.)
+  </p>
+
+  <p class="consent">
+    {{underline_choice:foto|Hozzájárulok|Nem járulok hozzá}}Hozzájárulok / Nem járulok hozzá, hogy iskolai rendezvényeken
+    készült fotók kikerülhessenek a honlapra.
+  </p>
+
+  <p class="consent">
+    {{underline_choice:fogadofoto|Hozzájárulok|Nem járulok hozzá}}Hozzájárulok / Nem járulok hozzá, hogy a Fogadó Intézmények
+    rendezvényein készült fotók kikerülhessenek az intézmény honlapjára.
+  </p>
+
+  <p class="consent-note">(aláhúzandó)</p>
+
+  <p class="date">Dátum: {{keltezes_datuma}}</p>
+
+  <div class="signature">
+    <div class="signature-line">………………………………………………………</div>
+    <div class="signature-label">tanuló aláírása</div>
+  </div>
+
+</div>
+</body>
+</html>
